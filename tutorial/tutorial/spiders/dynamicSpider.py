@@ -10,13 +10,7 @@ class DynamicspiderSpider(scrapy.Spider):
         self.allowed_domains = allowed_domains.split(',') if allowed_domains else []
 
     def parse(self, response):
-        # You can add dynamic selectors for different website elements here
         print(f"Parsing page: {response.url}")
-
-        # Example of dynamic CSS selectors for headlines, links, etc.
-        # You can pass this through arguments or handle via settings/configurations.
-
-        # For example, extracting headings
         headings = response.css("h1, h2, h3, h4, h5, h6")
         for heading in headings:
             text = heading.css('::text').get()
@@ -25,7 +19,6 @@ class DynamicspiderSpider(scrapy.Spider):
                 'url': response.url
             }
 
-        # You can add more dynamic sections like paragraphs, articles, etc.
         paragraphs = response.css("p")
         for para in paragraphs:
             text = para.css('::text').get()
@@ -34,7 +27,6 @@ class DynamicspiderSpider(scrapy.Spider):
                 'url': response.url
             }
 
-        # Extracting links dynamically
         links = response.css('a::attr(href)').getall()
         for link in links:
             full_url = response.urljoin(link)
@@ -43,8 +35,14 @@ class DynamicspiderSpider(scrapy.Spider):
                 'url': response.url
             }
 
-        # Pagination handling
-        next_page = response.css('a.next::attr(href)').get()  # Adjust for specific pagination
+        lists = response.css('ul')
+        for list in lists:
+            list_items = list.css('li')
+            for list_item in list_items:
+                yield {
+                    "list_item":list_item.css('::text').get()
+                }
+        next_page = response.css('a.next::attr(href)').get() 
         if next_page:
             next_page_url = response.urljoin(next_page)
             print(f"Next page URL: {next_page_url}")
