@@ -1,17 +1,36 @@
 import scrapy
 from datetime import datetime
 import re
+from sqlalchemy import create_engine
+from urllib.parse import quote
+from sqlalchemy.orm import sessionmaker
+from scriptRun import WebsiteScraped
+
+db_username = "master"
+db_password = "Aspl@345!"
+db_host = "1.23.242.234"
+db_port = '3306'
+db_name = "gurugaon_sm_cid"
+
+encoded_password = quote(db_password)
+
+
+engine = create_engine(f"mysql+pymysql://{db_username}:{encoded_password}@{db_host}:{db_port}/{db_name}")
+Session = sessionmaker(bind=engine)
+session = Session()
 
 def extractDates(html_content):
-        date_pattern = r'>\s*(\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2},\s\d{4}\s\d{1,2}:\d{2}\s(?:am|pm))\s*<'
+        try:
+            date_pattern = r'>\s*(\b(?:January|February|March|April|May|June|July|August|September|October|November|December)\s\d{1,2},\s\d{4}\s\d{1,2}:\d{2}\s(?:am|pm))\s*<'
 
-        # Search for the pattern in the HTML content
-        match = re.search(date_pattern, html_content)
+            match = re.search(date_pattern, html_content)
 
-        if match:
-            date_time = match.group(1)
-            return date_time
-        else:
+            if match:
+                date_time = match.group(1)
+                return date_time
+            else:
+                return None
+        except:
             return None
 
 class DynamicspiderSpider(scrapy.Spider):
@@ -24,6 +43,23 @@ class DynamicspiderSpider(scrapy.Spider):
 
     def parse(self, response):
         today_date = datetime.today().strftime('%A, %B %d, %Y')
+        
+        date_divs = ["div.epaper-date::text","div.column p::text"]
+        dates = []
+
+        for date_div in date_divs:
+            date_today = response.css(date_div).get()
+
+            # Check if date_today is not None
+            if date_today:
+                date_today = date_today  # Clean up the date string
+                dates.append(date_today)  # Add the date to the list
+            else:
+                self.log(f"No date found for selector: {date_div}")
+
+        existing_record = session.query(WebsiteScraped).filter(WebsiteScraped.url == response.url).first()
+        url_id = existing_record.id if existing_record else None
+
         print(f"Parsing page: {response.url}")
         headings = response.css("a")
         for heading in headings:
@@ -33,8 +69,9 @@ class DynamicspiderSpider(scrapy.Spider):
             yield {
                 'text': text,
                 'url': response.urljoin(url),
-                'publish_date': today_date,
-                'parent-div': extractDates(parent_div)
+                'publish_date': dates[0],
+                'article_date': extractDates(parent_div),
+                'website_Scrap_id':url_id
             }
 
         paragraphs = response.css("p")
@@ -43,7 +80,8 @@ class DynamicspiderSpider(scrapy.Spider):
             yield {
                 'text': text,
                 'url': response.url,
-                'publish_date': today_date
+                'publish_date': dates[0],
+                'website_Scrap_id':url_id
             }
 
         
@@ -63,7 +101,8 @@ class DynamicspiderSpider(scrapy.Spider):
                 yield {
                     "text":list_item.css('::text').get(),
                     "url" : response.urljoin(list_item_link.get()),
-                    'publish_date': today_date
+                    'publish_date': dates[0],
+                    'website_Scrap_id':url_id
                 }       
         next_page = response.css('a.next::attr(href)').get() 
         if next_page:
