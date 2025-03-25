@@ -44,7 +44,7 @@ class DynamicspiderSpider(scrapy.Spider):
     def parse(self, response):
         today_date = datetime.today().strftime('%A, %B %d, %Y')
         
-        date_divs = ["div.epaper-date::text","div.column p::text"]
+        date_divs = ["div.epaper-date::text","div.column p::text","div.date span::text","div.jsx-c1a6c01267c54545.sliderHd.text-center::text"]
         dates = []
 
         for date_div in date_divs:
@@ -55,6 +55,7 @@ class DynamicspiderSpider(scrapy.Spider):
                 date_today = date_today  # Clean up the date string
                 dates.append(date_today)  # Add the date to the list
             else:
+                dates.append(today_date)
                 self.log(f"No date found for selector: {date_div}")
 
         existing_record = session.query(WebsiteScraped).filter(WebsiteScraped.url == response.url).first()
